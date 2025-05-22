@@ -25,6 +25,22 @@ else:
 
 
 class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
+    def _generate_logo_mask(self, logo_image: torch.Tensor, padding: int) -> torch.Tensor:  
+    """生成logo区域的遮罩"""  
+    # 这里可以根据logo图像生成对应的遮罩  
+    # 简单实现：在图像中心区域创建遮罩  
+    batch_size, channels, height, width = logo_image.shape  
+    mask = torch.zeros((batch_size, 1, height, width), device=logo_image.device)  
+      
+    # 在中心区域创建logo遮罩  
+    center_h, center_w = height // 2, width // 2  
+    logo_size = min(height, width) // 4  # logo占图像的1/4  
+      
+    mask[:, :,   
+         center_h - logo_size//2:center_h + logo_size//2,  
+         center_w - logo_size//2:center_w + logo_size//2] = 1.0  
+      
+    return crop_padding(mask, padding)
     def _run_stage1(
         self,
         prompt: Union[str, List[str]] = None,
@@ -415,13 +431,22 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
                         original_latents / self.vae.config.scaling_factor,
                         return_dict=True,
                     ).sample
+                    
 
                     # compute the score of Scanninig Robust Perceptual Guidance (SRPG)
+                    logo_tensor = None  
+                    logo_mask_tensor = None  
+                    if logo_image is not None:  
+                    # 预处理logo图像，生成遮罩  
+                        logo_tensor = self.image_processor.preprocess(logo_image)  
+                        logo_mask_tensor = self._generate_logo_mask(logo_tensor, qrcode_padding)  
                     score = self.srpg.compute_score(
                         latents=latents,
                         image=crop_padding(self.image_processor.denormalize(original_image), qrcode_padding),
                         qrcode=crop_padding(image_binarize(qrcode[qrcode.size(0) // 2, None]), qrcode_padding),
                         ref_image=crop_padding(ref_image, qrcode_padding),
+                        logo_image=logo_tensor,  # 新增  
+                        logo_mask=logo_mask_tensor,  # 新增  
                     )
 
                     timesteps_prev = t - self.scheduler.config.num_train_timesteps // self.scheduler.num_inference_steps
@@ -467,6 +492,8 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
                         image=crop_padding(self.image_processor.denormalize(original_image), qrcode_padding),
                         qrcode=crop_padding(image_binarize(qrcode[qrcode.size(0) // 2, None]), qrcode_padding),
                         ref_image=crop_padding(ref_image, qrcode_padding),
+                        logo_image=logo_tensor,  # 新增  
+                        logo_mask=logo_mask_tensor,  # 新增  
                     )
                     loss.backward()
                     optimizer.step()
