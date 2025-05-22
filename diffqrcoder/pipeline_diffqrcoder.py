@@ -133,7 +133,9 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
             module_size=qrcode_module_size,
             scanning_robust_guidance_scale=scanning_robust_guidance_scale,
             perceptual_guidance_scale=perceptual_guidance_scale,
+            logo_guidance_scale=logo_guidance_scale,  # 新增  
         ).to(self.device).to(self.dtype)
+        
 
         callback = kwargs.pop("callback", None)
         callback_steps = kwargs.pop("callback_steps", None)
@@ -501,45 +503,47 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
         return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
 
     @torch.no_grad()
-    def __call__(
-        self,
-        prompt: Union[str, List[str]] = None,
-        qrcode: PipelineImageInput = None,
-        qrcode_module_size: int = 20,
-        qrcode_padding: int = 78,
-        height: Optional[int] = None,
-        width: Optional[int] = None,
-        num_inference_steps: int = 50,
-        timesteps: List[int] = None,
-        sigmas: List[float] = None,
-        guidance_scale: float = 7.5,
-        negative_prompt: Optional[Union[str, List[str]]] = None,
-        num_images_per_prompt: Optional[int] = 1,
-        eta: float = 0.0,
-        generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
-        latents: Optional[torch.Tensor] = None,
-        prompt_embeds: Optional[torch.Tensor] = None,
-        negative_prompt_embeds: Optional[torch.Tensor] = None,
-        ip_adapter_image: Optional[PipelineImageInput] = None,
-        ip_adapter_image_embeds: Optional[List[torch.Tensor]] = None,
-        output_type: Optional[str] = "pil",
-        return_dict: bool = True,
-        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
-        controlnet_conditioning_scale: Union[float, List[float]] = 1.0,
-        guess_mode: bool = False,
-        control_guidance_start: Union[float, List[float]] = 0.0,
-        control_guidance_end: Union[float, List[float]] = 1.0,
-        scanning_robust_guidance_scale: int = 500,
-        perceptual_guidance_scale: int = 10,
-        clip_skip: Optional[int] = None,
-        srmpgd_num_iteration: Optional[int] = None,
-        srmpgd_lr: Optional[float] = 0.1,
-        callback_on_step_end: Optional[
-            Union[Callable[[int, int, Dict], None], PipelineCallback, MultiPipelineCallbacks]
-        ] = None,
-        callback_on_step_end_tensor_inputs: List[str] = ["latents"],
-        **kwargs,
-    ):
+    def __call__(  
+    self,  
+    prompt: Union[str, List[str]] = None,  
+    qrcode: PipelineImageInput = None,  
+    qrcode_module_size: int = 20,  
+    qrcode_padding: int = 78,  
+    height: Optional[int] = None,  
+    width: Optional[int] = None,  
+    num_inference_steps: int = 50,  
+    timesteps: List[int] = None,  
+    sigmas: List[float] = None,  
+    guidance_scale: float = 7.5,  
+    negative_prompt: Optional[Union[str, List[str]]] = None,  
+    num_images_per_prompt: Optional[int] = 1,  
+    eta: float = 0.0,  
+    generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,  
+    latents: Optional[torch.Tensor] = None,  
+    prompt_embeds: Optional[torch.Tensor] = None,  
+    negative_prompt_embeds: Optional[torch.Tensor] = None,  
+    ip_adapter_image: Optional[PipelineImageInput] = None,  
+    ip_adapter_image_embeds: Optional[List[torch.Tensor]] = None,  
+    logo_image: Optional[PipelineImageInput] = None,  # 新增  
+    logo_guidance_scale: int = 100,  # 新增  
+    output_type: Optional[str] = "pil",  
+    return_dict: bool = True,  
+    cross_attention_kwargs: Optional[Dict[str, Any]] = None,  
+    controlnet_conditioning_scale: Union[float, List[float]] = 1.0,  
+    guess_mode: bool = False,  
+    control_guidance_start: Union[float, List[float]] = 0.0,  
+    control_guidance_end: Union[float, List[float]] = 1.0,  
+    scanning_robust_guidance_scale: int = 500,  
+    perceptual_guidance_scale: int = 10,  
+    clip_skip: Optional[int] = None,  
+    srmpgd_num_iteration: Optional[int] = None,  
+    srmpgd_lr: Optional[float] = 0.1,  
+    callback_on_step_end: Optional[  
+        Union[Callable[[int, int, Dict], None], PipelineCallback, MultiPipelineCallbacks]  
+    ] = None,  
+    callback_on_step_end_tensor_inputs: List[str] = ["latents"],  
+    **kwargs,  
+):
         stage1_output = self._run_stage1(
             prompt=prompt,
             qrcode=qrcode,
