@@ -1,29 +1,24 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from .vgg import VGGFeatureExtractor
-
-class LogoLoss(nn.Module):
-    def __init__(self, feature_layers=[3, 8, 15, 22], use_normalize=True):
-        super().__init__()
-        self.feature_extractor = VGGFeatureExtractor(feature_layers=feature_layers, use_normalize=use_normalize)
-        self.mse_loss = nn.MSELoss()
-        
-    def forward(self, generated_image: torch.Tensor, logo_image: torch.Tensor, logo_mask: torch.Tensor) -> torch.Tensor:
-        # Normalize inputs if needed
-        generated_image = (generated_image + 1) / 2  # [-1,1] to [0,1]
-        logo_image = (logo_image + 1) / 2
-        
-        # Apply mask to generated image
-        logo_region = generated_image * logo_mask
-        
-        # Extract features
-        logo_features = self.feature_extractor(logo_region)
-        target_features = self.feature_extractor(logo_image)
-        
-        # Calculate multi-scale perceptual loss
-        loss = 0
-        for (gen_feat, tgt_feat) in zip(logo_features, target_features):
-            loss += self.mse_loss(gen_feat, tgt_feat)
-        
-        return loss / len(logo_features)
+import torch  
+import torch.nn.functional as F  
+from torch import nn  
+from .perceptual_loss import VGGFeatureExtractor  
+  
+class LogoLoss(nn.Module):  
+    def __init__(self, requires_grad: bool = False):  
+        super().__init__()  
+        self.feature_extractor = VGGFeatureExtractor(requires_grad=requires_grad)  
+          
+    def forward(self, generated_image: torch.Tensor, logo_image: torch.Tensor, logo_mask: torch.Tensor) -> torch.Tensor:  
+        # 提取logo区域特征  
+        logo_region = generated_image * logo_mask  
+        target_region = logo_image * logo_mask  
+          
+        # 计算特征相似性损失  
+        generated_features = self.feature_extractor(logo_region)  
+        target_features = self.feature_extractor(target_region)  
+          
+        loss = 0  
+        for gen_feat, tar_feat in zip(generated_features, target_features):  
+            loss += F.mse_loss(gen_feat, tar_feat)  
+          
+        return loss / len(generated_features)
