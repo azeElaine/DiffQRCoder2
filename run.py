@@ -88,6 +88,19 @@ def parse_arguments() -> Namespace:
         type=str,
         default="output"
     )
+    # 在这里添加新的 logo 参数  
+    parser.add_argument(  
+        "--logo_path",  
+        type=str,  
+        default="",  
+        help="Path to logo image file"  
+    )  
+    parser.add_argument(  
+        "--logo_guidance_scale",   
+        type=int,  
+        default=100,  
+        help="Scale for logo guidance loss"  
+    )  
     return parser.parse_args()
 
 
@@ -112,6 +125,8 @@ if __name__ == "__main__":
     result = pipe(
         prompt=args.prompt,
         qrcode=qrcode,
+        logo_image=load_image(args.logo_path) if args.logo_path else None,  # 新增  
+        logo_guidance_scale=args.logo_guidance_scale,  # 新增  
         qrcode_module_size=args.qrcode_module_size,
         qrcode_padding=args.qrcode_padding,
         negative_prompt=args.neg_prompt,
