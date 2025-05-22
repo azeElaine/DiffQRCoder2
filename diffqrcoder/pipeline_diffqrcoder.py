@@ -29,18 +29,18 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
     """生成logo区域的遮罩"""  
     # 这里可以根据logo图像生成对应的遮罩  
     # 简单实现：在图像中心区域创建遮罩  
-    batch_size, channels, height, width = logo_image.shape  
-    mask = torch.zeros((batch_size, 1, height, width), device=logo_image.device)  
+        batch_size, channels, height, width = logo_image.shape  
+        mask = torch.zeros((batch_size, 1, height, width), device=logo_image.device)  
       
     # 在中心区域创建logo遮罩  
-    center_h, center_w = height // 2, width // 2  
-    logo_size = min(height, width) // 4  # logo占图像的1/4  
+        center_h, center_w = height // 2, width // 2  
+        logo_size = min(height, width) // 4  # logo占图像的1/4  
       
-    mask[:, :,   
-         center_h - logo_size//2:center_h + logo_size//2,  
-         center_w - logo_size//2:center_w + logo_size//2] = 1.0  
+        mask[:, :,   
+             center_h - logo_size//2:center_h + logo_size//2,  
+             center_w - logo_size//2:center_w + logo_size//2] = 1.0  
       
-    return crop_padding(mask, padding)
+        return crop_padding(mask, padding)
     def _run_stage1(
         self,
         prompt: Union[str, List[str]] = None,
@@ -107,6 +107,7 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
 
     def _run_stage2(
         self,
+        logo_guidance_scale: int = 100,
         prompt: Union[str, List[str]] = None,
         qrcode: PipelineImageInput = None,
         qrcode_module_size: int = 20,
