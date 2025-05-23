@@ -25,21 +25,29 @@ else:
 
 
 class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
-    def _generate_logo_mask(self, logo_image: torch.Tensor, padding: int) -> torch.Tensor:  
-    """生成logo区域的遮罩"""  
-    # 这里可以根据logo图像生成对应的遮罩  
-    # 简单实现：在图像中心区域创建遮罩  
-        batch_size, channels, height, width = logo_image.shape  
-        mask = torch.zeros((batch_size, 1, height, width), device=logo_image.device)  
-      
-    # 在中心区域创建logo遮罩  
-        center_h, center_w = height // 2, width // 2  
-        logo_size = min(height, width) // 4  # logo占图像的1/4  
-      
-        mask[:, :,   
-             center_h - logo_size//2:center_h + logo_size//2,  
-             center_w - logo_size//2:center_w + logo_size//2] = 1.0  
-      
+    def _generate_logo_mask(self, logo_image: torch.Tensor, padding: int) -> torch.Tensor:
+        batch_size, channels, height, width = logo_image.shape
+    
+    # 动态计算Logo尺寸并校验
+        logo_size = max(1, min(height, width) // 4)
+        if padding >= min(height, width) // 2:
+            raise ValueError("Padding exceeds half of image size")
+    
+    # 创建布尔类型遮罩（节省内存）
+        mask = torch.zeros((batch_size, height, width), 
+                           device=logo_image.device,
+                           dtype=torch.bool)
+    
+    # 计算中心区域（适配奇偶尺寸）
+        h_start = (height - logo_size) // 2
+        h_end = h_start + logo_size
+        w_start = (width - logo_size) // 2
+        w_end = w_start + logo_size
+    
+    # 批量赋值（无需通道维度）
+        mask[:, h_start:h_end, w_start:w_end] = True
+    
+    # 裁剪边缘填充
         return crop_padding(mask, padding)
     def _run_stage1(
         self,
