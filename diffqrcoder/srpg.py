@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from diffqrcoder.losses import PerceptualLoss, ScanningRobustLoss
-
+from diffqrcoder.losses import LogoLoss
 
 
 GRADIENT_SCALE = 100
@@ -15,7 +15,7 @@ class ScanningRobustPerceptualGuidance(nn.Module):
         scanning_robust_guidance_scale: int = 500,
         perceptual_guidance_scale: int = 2,
         logo_guidance_scale: int = 100,
-        feature_layers: list = [3, 8, 15, 22],
+        feature_layer: int = 34,
         use_normalize: bool = True
     ):
         super().__init__()
@@ -25,7 +25,7 @@ class ScanningRobustPerceptualGuidance(nn.Module):
         self.logo_guidance_scale = logo_guidance_scale
         self.scanning_robust_loss_fn = ScanningRobustLoss(module_size=module_size)
         self.perceptual_loss_fn = PerceptualLoss()
-        self.logo_loss_fn = LogoLoss(feature_layers=feature_layers, use_normalize=use_normalize)
+        self.logo_loss_fn = LogoLoss(feature_layer=feature_layer, use_input_norm=use_normalize) 
 
     def compute_loss(self,
         image: torch.Tensor,
