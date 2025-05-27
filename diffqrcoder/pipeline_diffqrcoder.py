@@ -25,36 +25,39 @@ else:
 
 
 class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
-    def _generate_logo_mask(self, logo_image: torch.Tensor, padding: int) -> torch.Tensor:
-        batch_size, channels, height, width = logo_image.shape
-    
-    # 动态计算Logo尺寸并校验
-        logo_size = max(1, min(height, width) // 4)
-        if padding >= min(height, width) // 2:
-            raise ValueError("Padding exceeds half of image size")
-    
-    # 创建布尔类型遮罩（节省内存）
-        mask = torch.zeros((batch_size, height, width), 
-                           device=logo_image.device,
-                           dtype=torch.bool)
-    
-    # 计算中心区域（适配奇偶尺寸）
-        h_start = (height - logo_size) // 2
-        h_end = h_start + logo_size
-        w_start = (width - logo_size) // 2
-        w_end = w_start + logo_size
-    
-    # 批量赋值（无需通道维度）
-        mask[:, h_start:h_end, w_start:w_end] = True
-    
-    # 裁剪边缘填充
+    def _generate_logo_mask(self, logo_image: torch.Tensor, padding: int) -> torch.Tensor:  
+        batch_size, channels, height, width = logo_image.shape  
+  
+    # 动态计算Logo尺寸并校验  
+        logo_size = max(1, min(height, width) // 4)  
+        if padding >= min(height, width) // 2:  
+            raise ValueError("Padding exceeds half of image size")  
+  
+    # 创建布尔类型遮罩（节省内存）  
+        mask = torch.zeros((batch_size, height, width),   
+                           device=logo_image.device,  
+                           dtype=torch.bool)  
+  
+    # 计算中心区域（适配奇偶尺寸）  
+        h_start = (height - logo_size) // 2  
+        h_end = h_start + logo_size  
+        w_start = (width - logo_size) // 2  
+        w_end = w_start + logo_size  
+  
+    # 批量赋值（无需通道维度）  
+        mask[:, h_start:h_end, w_start:w_end] = True  
+  
+    # Add channel dimension before cropping  
+        mask = mask.unsqueeze(1)  # Shape becomes (batch_size, 1, height, width)  
+      
+    # 裁剪边缘填充  
         return crop_padding(mask, padding)
     def _run_stage1(
         self,
         prompt: Union[str, List[str]] = None,
         qrcode: PipelineImageInput = None,
-        height: Optional[int] = None,
-        width: Optional[int] = None,
+        height: Optional[int] = 512,
+        width: Optional[int] = 512,
         num_inference_steps: int = 50,
         timesteps: List[int] = None,
         sigmas: List[float] = None,
@@ -116,13 +119,14 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
     def _run_stage2(
         self,
         logo_guidance_scale: int = 100,
+        logo_image: Optional[PipelineImageInput] = None,  # Add this line 
         prompt: Union[str, List[str]] = None,
         qrcode: PipelineImageInput = None,
         qrcode_module_size: int = 20,
         qrcode_padding: int = 78,
         ref_image: PipelineImageInput = None,
-        height: Optional[int] = None,
-        width: Optional[int] = None,
+        height: Optional[int] = 512,
+        width: Optional[int] =512,
         num_inference_steps: int = 50,
         timesteps: List[int] = None,
         sigmas: List[float] = None,
@@ -442,13 +446,33 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
                     ).sample
                     
 
-                    # compute the score of Scanninig Robust Perceptual Guidance (SRPG)
-                    logo_tensor = None  
-                    logo_mask_tensor = None  
+                    # compute the score of Scanning Robust Perceptual Guidance (SRPG)  
                     if logo_image is not None:  
-                    # 预处理logo图像，生成遮罩  
-                        logo_tensor = self.image_processor.preprocess(logo_image)  
-                        logo_mask_tensor = self._generate_logo_mask(logo_tensor, qrcode_padding)  
+                        # First get the processed and cropped image dimensions  
+                        processed_image = crop_padding(self.image_processor.denormalize(original_image), qrcode_padding)  
+                        target_height, target_width = processed_image.shape[-2:]  
+      
+                        target_device = original_image.device  
+                        target_dtype = original_image.dtype  
+                        # Apply both device and dtype conversion  
+                        logo_tensor = self.image_processor.preprocess(logo_image).to(device=target_device, dtype=target_dtype)  
+      
+                        if logo_tensor.shape[-2:] != (target_height, target_width): 
+                            logo_tensor = torch.nn.functional.interpolate(logo_tensor,size=(target_height, target_width),  mode='bilinear', align_corners=False  )  
+                        batch_size = logo_tensor.shape[0]  
+                        logo_size = max(1, min(target_height, target_width) // 4)  
+                        mask = torch.zeros((batch_size, 1, target_height, target_width), device=target_device, dtype=target_dtype)
+      
+                        h_start = (target_height - logo_size) // 2  
+                        h_end = h_start + logo_size  
+                        w_start = (target_width - logo_size) // 2  
+                        w_end = w_start + logo_size  
+      
+                        mask[:, :, h_start:h_end, w_start:w_end] = 1.0  
+                        logo_mask_tensor = mask  
+                    else:  
+                        logo_tensor = None  
+                        logo_mask_tensor = None
                     score = self.srpg.compute_score(
                         latents=latents,
                         image=crop_padding(self.image_processor.denormalize(original_image), qrcode_padding),
@@ -545,8 +569,8 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
     qrcode: PipelineImageInput = None,  
     qrcode_module_size: int = 20,  
     qrcode_padding: int = 78,  
-    height: Optional[int] = None,  
-    width: Optional[int] = None,  
+    height: Optional[int] =512,  
+    width: Optional[int] =512,  
     num_inference_steps: int = 50,  
     timesteps: List[int] = None,  
     sigmas: List[float] = None,  
@@ -610,6 +634,8 @@ class DiffQRCoderPipeline(StableDiffusionControlNetPipeline):
             callback_on_step_end_tensor_inputs=callback_on_step_end_tensor_inputs,
         )
         stage2_output = self._run_stage2(
+            logo_image=logo_image,  # Add this line  
+            logo_guidance_scale=logo_guidance_scale,  # Add this line too 
             prompt=prompt,
             qrcode=qrcode,
             qrcode_module_size=qrcode_module_size,
